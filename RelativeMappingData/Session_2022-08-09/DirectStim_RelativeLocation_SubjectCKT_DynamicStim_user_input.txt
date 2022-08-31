@@ -1,0 +1,13 @@
+ICVP Direct Stim Program 3.1.1+v3.1.1 - RelativeLocations
+Updated at: 2022-08-09--13-42-07
+Subject ID: CKT
+Tester ID: mbarry
+Direct Stimulation Input from the UI
+
+UserID ; Time ; Electrodes ; Frequency (Hz) ; Cathodic Phase Duration (us) ; Train Length (ms) ; Duty On (ms); Duty Off (ms) ; Inter-train Length (ms) ; Amplitude (uA) ; Sent to Gateway ; Response ; Response Latency (ms) ; Response Duration (ms) ; Comments
+mbarry ; 2022-08-09--13-42-07 ; 0D02-0D03 , 0D02-0D03-0D0B-0D0A ; 200 ; 200 ; 700 ; 700 ; 0 ; 0 ; 40 ; True ;  ;  ;  ; Moved left and slightly down, first was dark, second with bright, right on top of each other
+mbarry ; 2022-08-09--13-44-48 ; 250C-250D , 250C-250D-2503-2502 ; 200 ; 200 ; 700 ; 700 ; 0 ; 0 ; 40 ; True ;  ;  ;  ; Maybe one dark and one iridescent phosphene, no difference between first and second electrode group, except fading
+mbarry ; 2022-08-09--13-52-01 ; 0D02-0D03 , 0D02-0D03-0D0B-0D0A ; 200 ; 200 ; 900 ; 900 ; 0 ; 0 ; 40 ; True ;  ;  ;  ; Moved left, forgot what they looked like, CKT reported that one phosphene appeared, followed by a repeat, followed by another repeat of that phosphene with another phosphene.
+mbarry ; 2022-08-09--14-18-51 ; 0D02-0D03 , 0D02-0D03-0D0B-0D0A ; 200 ; 200 ; 310 ; 310 ; 0 ; 0 ; 40 ; True ;  ;  ;  ; Saw something, but it was way too fast
+mbarry ; 2022-08-09--14-20-38 ; 0D02-0D03 , 0D02-0D03-0D0B-0D0A ; 200 ; 200 ; 310 ; 310 ; 0 ; 0 ; 40 ; True ;  ;  ;  ; A little bit of space between phosphenes that did not appear simultaneously
+mbarry ; 2022-08-09--14-22-10 ; 250C-250D , 250C-250D-2503-2502 ; 200 ; 200 ; 310 ; 310 ; 0 ; 0 ; 40 ; True ;  ;  ;  ; Seem to still be appearing separately

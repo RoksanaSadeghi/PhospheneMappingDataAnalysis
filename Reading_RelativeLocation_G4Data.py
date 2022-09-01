@@ -7,7 +7,7 @@ Created on Wed Aug 31 13:42:31 2022
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 #reading the directories and files
 def FileDir( directory, nametag ):
     sessiondir = []
@@ -129,12 +129,103 @@ def SaveSortedTrials(allTrials_sorted, mainDir):
         for groups in allTrials_sorted:
             f.writelines('\n'.join(groups[0,:]) + '\n')
     
+#assuming the saved text file is read and edited, read all trials from the text file
+def ReadSortedTrials(mainDir):
+    allTrials_txtFile = mainDir+"\\RelativeLocation_AllTrials.txt" 
+    with open(allTrials_txtFile) as f: allTrials_sorted_and_checked = f.readlines()
+    return allTrials_sorted_and_checked
+
+#remove trials that only one percept detected or finger tracker didn't collect finger positions
+def SeparateNonSeenTrials(allTrials_sorted_and_checked):
+    keywords = [
+        ["only","one"],
+        ["didn't","see"],
+        ["nothing",""],
+        ["not","sure"],
+        ["could","not"],
+        ["only","saw"],
+        ["couldnt",""],
+        ["couldn't",""],
+        ["cant",""],
+        ["can't",""],
+        ["anything",""],
+        ["only","1"],
+        ["differentiate",""]
+                ]
+    
+    included = []
+    excluded = []
+    for info in allTrials_sorted_and_checked:
+        var = False
+        comment = info.split(" ; ")[14]
+        ang1 = info.split(" ; ")[15].strip(" ")
+        ang2 = info.split(" ; ")[16].strip("\n")
+        for k in keywords:
+            var = var or ((k[0] in comment)and(k[1] in comment))
+        if var==False and (ang1!='nan' or ang2!='nan'):
+            included.append(info)
+        else:
+            excluded.append(info)
+    return included, excluded
+            
+# extract the electrodes and the directions
+def ElectrodeGroups_and_Directions(included):
+    electrode = []
+    direction = []
+    pairs = set()
+    for trial in included:
+        elecTxt = ""
+        # seperate electrodes
+        trial_electrode = np.array(trial.split(" ; ")[2].split(" , "))
+        trial_electrode[1] = np.char.strip( trial_electrode[1].replace(trial_electrode[0],"") , chars = '-')
+        electrode.append(trial_electrode)
+        # get the angles
+        ang1 = trial.split(" ; ")[15].strip(" ")
+        ang2 = trial.split(" ; ")[16].strip("\n")
+        ang = []
+        if ang1 == 'nan' and ang2 != 'nan':
+            ang = float(ang2)
+        elif ang1 != 'nan' and ang2 == 'nan':
+            ang = float(ang1)
+        else:
+            ang = 'nan'
+        
+        # check if it is in the set, adjust the direction
+        if ang != 'nan':
+            if ((trial_electrode[1],trial_electrode[0]) in pairs):
+                elecTxt = trial_electrode[1] + " , " + trial_electrode[0]
+                ang = 180 + ang
+            elif ((trial_electrode[0],trial_electrode[1]) in pairs):
+                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            else:
+                pairs.add((trial_electrode[0],trial_electrode[1]))
+                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            if ang < 0 : ang = 360 + ang
+            if ang > 359 : ang = 360 - ang
+        direction.append(elecTxt + " ; " + str(np.round(ang,2)))
+                
+    return direction        
+
+# save the direction of the pairs for seen trials and save the excluded data separately
+def SaveDirections(direction,excluded, mainDir):
+    directionTxt = mainDir + "\\RelativeLocation_sortedTrials.txt"
+    excludedTxt = mainDir + "\\RelativeLocation_excludedTrials.txt"
+    with open(directionTxt,'w') as df:
+        df.writelines('\n'.join(direction))
+    with open(excludedTxt,'w') as exf:
+        exf.writelines('\n'.join(excluded))
+   
+# mainDir = os.getcwd() + "\RelativeMappingData"
+# allTrials = CombineAllTrials(mainDir)
+# electrode = SeparateElecGroups(allTrials)
+# allTrials_sorted = SortTrials(electrode,allTrials)
+# SaveSortedTrials(allTrials_sorted, mainDir)
 
 mainDir = os.getcwd() + "\RelativeMappingData"
-allTrials = CombineAllTrials(mainDir)
-electrode = SeparateElecGroups(allTrials)
-allTrials_sorted = SortTrials(electrode,allTrials)
-SaveSortedTrials(allTrials_sorted, mainDir)
+allTrials_sorted_and_checked = ReadSortedTrials(mainDir)
+included,excluded = SeparateNonSeenTrials(allTrials_sorted_and_checked)
+direction = ElectrodeGroups_and_Directions(included)
+SaveDirections(direction,excluded, mainDir)
 
 # mainDir = os.getcwd() + "\RelativeMappingData"        
 # for item in FileDir(mainDir, "Session"):

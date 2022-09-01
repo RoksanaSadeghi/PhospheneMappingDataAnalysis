@@ -101,6 +101,7 @@ def SeparateElecGroups(allTrials):
         electrode.append(trial_electrode)
     return np.array(electrode)        
 
+#sort the trails
 def SortTrials(electrode,allTrials):
     pairs = set()
     index = []
@@ -121,6 +122,7 @@ def SortTrials(electrode,allTrials):
         
     return allTrials_sorted
 
+#save the sorted trials in a text file
 def SaveSortedTrials(allTrials_sorted, mainDir):
     textFile = mainDir + "\\RelativeLocation_AllTrials.txt"
     with open(textFile,'w') as f:
@@ -134,22 +136,22 @@ electrode = SeparateElecGroups(allTrials)
 allTrials_sorted = SortTrials(electrode,allTrials)
 SaveSortedTrials(allTrials_sorted, mainDir)
 
-mainDir = os.getcwd() + "\RelativeMappingData"        
-for item in FileDir(mainDir, "Session"):
-    g4Files = FileDir(mainDir + "\\" + item, "G4")
-    for g4 in g4Files:
-        param,g4Data = ReadG4(mainDir + "\\" + item + "\\" + g4)
-        sensor1,sensor2 = SeparateSensors(g4Data)
-        if len(sensor1)<8 or len(sensor2)<8:
-            angle1 = []
-            angle2 = []
-        elif ((np.std(sensor1[:,1]) < 1.0) and (np.std(sensor1[:,0]) < 1.0)):
-            angle1 = FitLineG4(sensor1)
-            angle2 = FitLineG4(sensor2)
-        else:
-            angle1 = []
-            angle2 = []
-        parameters = np.hstack((np.array(param.replace("\n","").split(" ; ")),angle1,angle2))
+# mainDir = os.getcwd() + "\RelativeMappingData"        
+# for item in FileDir(mainDir, "Session"):
+#     g4Files = FileDir(mainDir + "\\" + item, "G4")
+#     for g4 in g4Files:
+#         param,g4Data = ReadG4(mainDir + "\\" + item + "\\" + g4)
+#         sensor1,sensor2 = SeparateSensors(g4Data)
+#         if len(sensor1)<8 or len(sensor2)<8:
+#             angle1 = []
+#             angle2 = []
+#         elif ((np.std(sensor1[:,1]) < 1.0) and (np.std(sensor1[:,0]) < 1.0)):
+#             angle1 = FitLineG4(sensor1)
+#             angle2 = FitLineG4(sensor2)
+#         else:
+#             angle1 = []
+#             angle2 = []
+#         parameters = np.hstack((np.array(param.replace("\n","").split(" ; ")),angle1,angle2))
         
 
 

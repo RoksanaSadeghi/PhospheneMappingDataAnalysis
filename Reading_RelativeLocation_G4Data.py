@@ -7,7 +7,7 @@ Created on Wed Aug 31 13:42:31 2022
 
 import os
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 #reading the directories and files
 def FileDir( directory, nametag ):
     sessiondir = []
@@ -17,7 +17,7 @@ def FileDir( directory, nametag ):
             sessiondir.append(item)
     return sessiondir
 
-#reading the raw g4 data and output the stim parameters and the g4 finger positions
+# reading the raw g4 data and output the stim parameters and the g4 finger positions
 def ReadG4( g4FileDir ):
     with open(g4FileDir) as g4: lines = g4.readlines()
     tableParam = False
@@ -40,7 +40,7 @@ def ReadG4( g4FileDir ):
             continue       
     return param, g4Data
 
-#separate sensor 1 and sensor 2 finger positions 
+# separate sensor 1 and sensor 2 finger positions 
 def SeparateSensors(g4Data):
     sensor1 = np.empty((7,))
     sensor2 = np.empty((7,))
@@ -55,7 +55,7 @@ def SeparateSensors(g4Data):
             sensor2 = np.vstack((sensor2, m2))
     return sensor1, sensor2
 
-#fit a line and find the  angle with x axis for sensor1 and sensor2 data
+# fit a line and find the  angle with x axis for sensor1 and sensor2 data
 def FitLineG4(sensor):
     a,b = np.polyfit(sensor[:,1], sensor[:,0], 1)
     x0 = sensor[0,1]
@@ -64,7 +64,7 @@ def FitLineG4(sensor):
     y1 = x1 * a + b
     return np.round(np.degrees(np.arctan2(y1-y0,x1-x0)),2)
 
-#fit a line to sensor1 and sensor2 data and find the angle and update the param line
+# fit a line to sensor1 and sensor2 data and find the angle and update the param line
 def AddAngleToStimParametersLine(param, g4Data):
     sensor1,sensor2 = SeparateSensors(g4Data)
     angle1 = "nan"
@@ -82,7 +82,7 @@ def AddAngleToStimParametersLine(param, g4Data):
     parameters = " ; ".join(np.hstack((np.array(param.replace("\n","").split(" ; ")),angle1,angle2)))
     return parameters
 
-#combine all trials 
+# combine all trials 
 def CombineAllTrials(mainDir):
     trials = []
     for item in FileDir(mainDir, "Session"):
@@ -92,7 +92,7 @@ def CombineAllTrials(mainDir):
             trials.append(AddAngleToStimParametersLine(param, g4Data))
     return trials
 
-#separate the unique electrode groups and save them in an array for each trial
+# separate the unique electrode groups and save them in an array for each trial
 def SeparateElecGroups(allTrials):
     electrode = []
     for trial in allTrials:
@@ -101,7 +101,7 @@ def SeparateElecGroups(allTrials):
         electrode.append(trial_electrode)
     return np.array(electrode)        
 
-#sort the trails
+# sort the trails
 def SortTrials(electrode,allTrials):
     pairs = set()
     index = []
@@ -122,20 +122,20 @@ def SortTrials(electrode,allTrials):
         
     return allTrials_sorted
 
-#save the sorted trials in a text file
+# save the sorted trials in a text file
 def SaveSortedTrials(allTrials_sorted, mainDir):
     textFile = mainDir + "\\RelativeLocation_AllTrials.txt"
     with open(textFile,'w') as f:
         for groups in allTrials_sorted:
             f.writelines('\n'.join(groups[0,:]) + '\n')
     
-#assuming the saved text file is read and edited, read all trials from the text file
+# assuming the saved text file is read and edited, read all trials from the text file
 def ReadSortedTrials(mainDir):
     allTrials_txtFile = mainDir+"\\RelativeLocation_AllTrials.txt" 
     with open(allTrials_txtFile) as f: allTrials_sorted_and_checked = f.readlines()
     return allTrials_sorted_and_checked
 
-#remove trials that only one percept detected or finger tracker didn't collect finger positions
+# remove trials that only one percept detected or finger tracker didn't collect finger positions
 def SeparateNonSeenTrials(allTrials_sorted_and_checked):
     keywords = [
         ["only","one"],
@@ -169,16 +169,22 @@ def SeparateNonSeenTrials(allTrials_sorted_and_checked):
     return included, excluded
             
 # extract the electrodes and the directions
-def ElectrodeGroups_and_Directions(included):
-    electrode = []
+def ElectrodeGroups_and_Directions(allTrials,ifIncluded):
     direction = []
+    wfma = []
     pairs = set()
-    for trial in included:
+    for trial in allTrials: 
         elecTxt = ""
         # seperate electrodes
         trial_electrode = np.array(trial.split(" ; ")[2].split(" , "))
         trial_electrode[1] = np.char.strip( trial_electrode[1].replace(trial_electrode[0],"") , chars = '-')
-        electrode.append(trial_electrode)
+        
+        # separate the WFMAs
+        trial_wfma = []
+        trial_wfma.append(trial_electrode[0][0:2])
+        trial_wfma.append(trial_electrode[1][0:2])
+        wfma.append(trial_wfma)
+       
         # get the angles
         ang1 = trial.split(" ; ")[15].strip(" ")
         ang2 = trial.split(" ; ")[16].strip("\n")
@@ -191,30 +197,92 @@ def ElectrodeGroups_and_Directions(included):
             ang = 'nan'
         
         # check if it is in the set, adjust the direction
-        if ang != 'nan':
-            if ((trial_electrode[1],trial_electrode[0]) in pairs):
-                elecTxt = trial_electrode[1] + " , " + trial_electrode[0]
+        if ang != 'nan' and ifIncluded:
+            if ((trial_wfma[1],trial_wfma[0]) in pairs):
+                elecTxt = trial_electrode[1] + " ; " + trial_electrode[0]
                 ang = 180 + ang
-            elif ((trial_electrode[0],trial_electrode[1]) in pairs):
-                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            elif ((trial_wfma[0],trial_wfma[1]) in pairs):
+                elecTxt = trial_electrode[0] + " ; " + trial_electrode[1]
             else:
-                pairs.add((trial_electrode[0],trial_electrode[1]))
-                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+                pairs.add((trial_wfma[0],trial_wfma[1]))
+                elecTxt = trial_electrode[0] + " ; " + trial_electrode[1]
+            
             if ang < 0 : ang = 360 + ang
             if ang > 359 : ang = 360 - ang
-        direction.append(elecTxt + " ; " + str(np.round(ang,2)))
-                
-    return direction        
+        
+            direction.append(elecTxt + " ; " + str(np.round(ang,2)))
+            
+        elif not ifIncluded:#for sorting excluded trials
+            if ((trial_wfma[1],trial_wfma[0]) in pairs)or((trial_wfma[0],trial_wfma[1]) in pairs):
+                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            else:
+                pairs.add((trial_wfma[0],trial_wfma[1]))
+                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            direction.append(trial.strip('\n'))
+
+    # sort the direction list based on the index
+    direction_sorted = SortTrials(np.array(wfma),np.array(direction))
+        
+    return direction_sorted        
 
 # save the direction of the pairs for seen trials and save the excluded data separately
-def SaveDirections(direction,excluded, mainDir):
-    directionTxt = mainDir + "\\RelativeLocation_sortedTrials.txt"
+def SaveDirections(direction_sorted,excluded_sorteed, mainDir):
+    directionTxt = mainDir + "\\RelativeLocation_sortedDirections.txt"
     excludedTxt = mainDir + "\\RelativeLocation_excludedTrials.txt"
     with open(directionTxt,'w') as df:
-        df.writelines('\n'.join(direction))
+        df.writelines('Group1 (Hex) ; Group2 (Hex) ; Direction From Group1 to Group2 Relative to Positive Horizontal Direction (degree)\n')
+        for groups in direction_sorted:
+            df.writelines('\n'.join(groups[0,:]) + '\n\n')
     with open(excludedTxt,'w') as exf:
-        exf.writelines('\n'.join(excluded))
-   
+        exf.writelines('UserID ; Time ; Electrodes ; Frequency (Hz) ; Cathodic Phase Duration (us) ; Train Length (ms) ; Duty On (ms); Duty Off (ms) ; Inter-train Length (ms) ; Amplitude (uA) ; Sent to Gateway ; Comments ; Sensor1 Angle (Degree) ; Sensor2 Angle (Degree)\n')
+        for groups in excluded_sorted:
+            exf.writelines('\n'.join(groups[0,:])+'\n\n')
+
+# save the median and 1/4 and 3/4 for each wfma pair
+def SaveQuantiles(direction_sorted, mainDir):
+    lines = []
+    for group in direction_sorted:
+        ang = []
+        txt = []
+        for trial in group[0,:]:
+           t = trial.split(' ; ') 
+           ang.append(float(t[2]))
+        if (t[0][0:2] == t[1][0:2]):continue
+        wfma = t[0][0:2] + ' ; ' + t[1][0:2]
+        q1 = np.round( np.quantile(np.array(ang), 0.25) , 2)
+        q2 = np.round( np.quantile(np.array(ang), 0.5) , 2)
+        q3 = np.round( np.quantile(np.array(ang), 0.75) , 2)
+        txt.append( wfma )
+        txt.append( str( q1 ) )
+        txt.append( str( q2 ) )
+        txt.append( str( q3 ) )
+        txt.append( str( len(group[0,:]) ) )
+        lines.append(' ; '.join(txt))
+    
+    quartilesTxt = mainDir + '\\RelativeLocation_medianDirections.txt'
+    with open(quartilesTxt,'w') as m:
+        m.writelines('WFMA1 ; WFMA2 ; The First Quartile (degree) ; The Second Quartile (degree) ; The Third Quartile (degree) ; Number of Trials' )
+        m.writelines('\n'.join(lines))
+
+# quartiles
+def PlotQuartiles(mainDir):
+    quartilesTxt = mainDir + '\\RelativeLocation_medianDirections.txt'
+    with open (quartilesTxt) as f: quartilesLines = f.readlines()
+    quartilesLines = quartilesLines[1:]
+    for line in quartilesLines:
+        t = line.split(' ; ')
+        theta = np.radians(float(t[3]))
+        radii = 1
+        width = np.radians( np.abs(float(t[4]) - float(t[2])) )
+        title = str( int(t[0],16) ) + '-' + str( int(t[1],16) ) + ' : num. of trials = ' + t[5]  
+        
+        ax = plt.subplot(projection='polar')
+        ax.bar(theta, radii, width=width, bottom=0.0, alpha=0.5)
+        ax.bar(theta, radii, width=0.01, bottom=0.0, alpha=1)
+        plt.title(title)
+        plt.show()
+
+    
 # mainDir = os.getcwd() + "\RelativeMappingData"
 # allTrials = CombineAllTrials(mainDir)
 # electrode = SeparateElecGroups(allTrials)
@@ -224,8 +292,11 @@ def SaveDirections(direction,excluded, mainDir):
 mainDir = os.getcwd() + "\RelativeMappingData"
 allTrials_sorted_and_checked = ReadSortedTrials(mainDir)
 included,excluded = SeparateNonSeenTrials(allTrials_sorted_and_checked)
-direction = ElectrodeGroups_and_Directions(included)
-SaveDirections(direction,excluded, mainDir)
+direction_sorted = ElectrodeGroups_and_Directions(included,True)
+excluded_sorted = ElectrodeGroups_and_Directions(excluded,False)
+SaveDirections(direction_sorted,excluded_sorted, mainDir)
+SaveQuantiles(direction_sorted, mainDir)
+
 
 # mainDir = os.getcwd() + "\RelativeMappingData"        
 # for item in FileDir(mainDir, "Session"):

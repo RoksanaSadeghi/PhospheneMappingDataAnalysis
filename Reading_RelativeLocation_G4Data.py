@@ -169,7 +169,7 @@ def SeparateNonSeenTrials(allTrials_sorted_and_checked):
     return included, excluded
             
 # extract the electrodes and the directions
-def ElectrodeGroups_and_Directions(allTrials,ifIncluded):
+def ElectrodeGroups_and_Directions_betweenWFMAs(allTrials,ifIncluded):
     direction = []
     wfma = []
     pairs = set()
@@ -226,7 +226,7 @@ def ElectrodeGroups_and_Directions(allTrials,ifIncluded):
     return direction_sorted        
 
 # save the direction of the pairs for seen trials and save the excluded data separately
-def SaveDirections(direction_sorted,excluded_sorteed, mainDir):
+def SaveDirections(direction_sorted,excluded_sorted, mainDir):
     directionTxt = mainDir + "\\RelativeLocation_sortedDirections.txt"
     excludedTxt = mainDir + "\\RelativeLocation_excludedTrials.txt"
     with open(directionTxt,'w') as df:
@@ -239,7 +239,7 @@ def SaveDirections(direction_sorted,excluded_sorteed, mainDir):
             exf.writelines('\n'.join(groups[0,:])+'\n\n')
 
 # save the median and 1/4 and 3/4 for each wfma pair
-def SaveQuantiles(direction_sorted, mainDir):
+def SaveQuantiles_betweenWFMAs(direction_sorted, mainDir):
     lines = []
     for group in direction_sorted:
         ang = []
@@ -247,6 +247,7 @@ def SaveQuantiles(direction_sorted, mainDir):
         for trial in group[0,:]:
            t = trial.split(' ; ') 
            ang.append(float(t[2]))
+
         if (t[0][0:2] == t[1][0:2]):continue
         wfma = t[0][0:2] + ' ; ' + t[1][0:2]
         q1 = np.round( np.quantile(np.array(ang), 0.25) , 2)
@@ -261,41 +262,181 @@ def SaveQuantiles(direction_sorted, mainDir):
     
     quartilesTxt = mainDir + '\\RelativeLocation_medianDirections.txt'
     with open(quartilesTxt,'w') as m:
-        m.writelines('WFMA1 ; WFMA2 ; The First Quartile (degree) ; The Second Quartile (degree) ; The Third Quartile (degree) ; Number of Trials' )
+        m.writelines('WFMA1 (Hex) ; WFMA2 (Hex) ; First Quartile (degree) ; Second Quartile (degree) ; Third Quartile (degree) ; Number of Trials' )
         m.writelines('\n'.join(lines))
 
 # quartiles
-def PlotQuartiles(mainDir):
+def PlotQuartiles_betweenWFMAs(mainDir):
     quartilesTxt = mainDir + '\\RelativeLocation_medianDirections.txt'
     with open (quartilesTxt) as f: quartilesLines = f.readlines()
     quartilesLines = quartilesLines[1:]
+    if not os.path.exists(mainDir + '\\plots_betweenWFMAs\\'):
+        os.mkdir(mainDir + '\\plots_betweenWFMAs\\')
+        
     for line in quartilesLines:
         t = line.split(' ; ')
         theta = np.radians(float(t[3]))
         radii = 1
         width = np.radians( np.abs(float(t[4]) - float(t[2])) )
-        title = str( int(t[0],16) ) + '-' + str( int(t[1],16) ) + ' : num. of trials = ' + t[5]  
+        title = 'WFMA ' + str( int(t[0],16) ) + '-' + str( int(t[1],16) ) + ' : num. of trials = ' + t[5].strip('\n') + '\nMedian = ' +  t[3] + ' degrees'
         
-        ax = plt.subplot(projection='polar')
-        ax.bar(theta, radii, width=width, bottom=0.0, alpha=0.5)
-        ax.bar(theta, radii, width=0.01, bottom=0.0, alpha=1)
-        plt.title(title)
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'},figsize=(7,7))
+        ax.bar(theta, radii, width=width, bottom=0.0, alpha=0.5,label='Q1-Q3')
+        ax.bar(theta, radii, width=0.01, bottom=0.0, alpha=1,label='Median')
+        ax.set_title(title,size=12,wrap=False)
+        plt.legend()
+        plt.savefig(mainDir + '\\plots_betweenWFMAs\\'+'WFMA_' +
+                    str( int(t[0],16) ) + '-' + str( int(t[1],16) ) +
+                    '.png', bbox_inches='tight',dpi=300)
+        
         plt.show()
 
+# extract the electrodes and the directions
+def ElectrodeGroups_and_Directions_withinWFMA(allTrials,ifIncluded):
+    direction = []
+    electrode = []
+    pairs = set()
+    for trial in allTrials: 
+        elecTxt = ""
+        # seperate electrodes
+        trial_electrode = np.array(trial.split(" ; ")[2].split(" , "))
+        trial_electrode[1] = np.char.strip( trial_electrode[1].replace(trial_electrode[0],"") , chars = '-')
+        
+        # separate the WFMAs
+        trial_wfma = []
+        trial_wfma.append(trial_electrode[0][0:2])
+        trial_wfma.append(trial_electrode[1][0:2])
+        # only consider the trials within a WFMA
+        if trial_wfma[0]!=trial_wfma[1]:continue
+        electrode.append(trial_electrode)
+        
+        # get the angles
+        ang1 = trial.split(" ; ")[15].strip(" ")
+        ang2 = trial.split(" ; ")[16].strip("\n")
+        ang = []
+        if ang1 == 'nan' and ang2 != 'nan':
+            ang = float(ang2)
+        elif ang1 != 'nan' and ang2 == 'nan':
+            ang = float(ang1)
+        else:
+            ang = 'nan'
+        
+        # check if it is in the set, adjust the direction
+        if ang != 'nan' and ifIncluded:
+            if ((trial_electrode[1],trial_electrode[0]) in pairs):
+                elecTxt = trial_electrode[1] + " ; " + trial_electrode[0]
+                ang = 180 + ang
+            elif ((trial_electrode[0],trial_electrode[1]) in pairs):
+                elecTxt = trial_electrode[0] + " ; " + trial_electrode[1]
+            else:
+                pairs.add((trial_electrode[0],trial_electrode[1]))
+                elecTxt = trial_electrode[0] + " ; " + trial_electrode[1]
+            
+            if ang < 0 : ang = 360 + ang
+            if ang > 359 : ang = 360 - ang
+        
+            direction.append(elecTxt + " ; " + str(np.round(ang,2)))
+            
+        elif not ifIncluded:#for sorting excluded trials
+            if ((trial_electrode[1],trial_electrode[0]) in pairs)or((trial_electrode[0],trial_electrode[1]) in pairs):
+                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            else:
+                pairs.add((trial_electrode[0],trial_electrode[1]))
+                elecTxt = trial_electrode[0] + " , " + trial_electrode[1]
+            direction.append(trial.strip('\n'))
+
+    # sort the direction list based on the index
+    direction_sorted = SortTrials(np.array(electrode),np.array(direction))
+        
+    return direction_sorted  
+
+# save the median and 1/4 and 3/4 for each wfma pair
+def SaveQuantiles_withinWFMA(direction_sorted, mainDir):
+    lines = []
+    for group in direction_sorted:
+        ang = []
+        txt = []
+        for trial in group[0,:]:
+           t = trial.split(' ; ') 
+           ang.append(float(t[2]))
+
+        elec = t[0] + ' ; ' + t[1]
+        q1 = np.round( np.quantile(np.array(ang), 0.25) , 2)
+        q2 = np.round( np.quantile(np.array(ang), 0.5) , 2)
+        q3 = np.round( np.quantile(np.array(ang), 0.75) , 2)
+        txt.append( elec )
+        txt.append( str( q1 ) )
+        txt.append( str( q2 ) )
+        txt.append( str( q3 ) )
+        txt.append( str( len(group[0,:]) ) )
+        lines.append(' ; '.join(txt))
     
+    quartilesTxt = mainDir + '\\RelativeLocation_medianDirections.txt'
+    with open(quartilesTxt,'w') as m:
+        m.writelines('WFMA1 (Hex) ; WFMA2 (Hex) ; First Quartile (degree) ; Second Quartile (degree) ; Third Quartile (degree) ; Number of Trials' )
+        m.writelines('\n'.join(lines))
+
+# quartiles
+def PlotQuartiles_withinWFMA(mainDir):
+    quartilesTxt = mainDir + '\\RelativeLocation_medianDirections.txt'
+    with open (quartilesTxt) as f: quartilesLines = f.readlines()
+    quartilesLines = quartilesLines[1:]
+    if not os.path.exists(mainDir + '\\plots_withinWFMAs\\'):
+        os.mkdir(mainDir + '\\plots_withinWFMAs\\')
+        
+    for line in quartilesLines:
+        t = line.split(' ; ')
+        theta = np.radians(float(t[3]))
+        radii = 1
+        width = np.radians( np.abs(float(t[4]) - float(t[2])) )
+        title = 'WFMA ' + str( int(t[0][0:2],16) ) + ',' + str( int(t[0][2:4],16) + 1 ) + \
+            '-' + str( int(t[1][0:2],16) ) + ',' + str( int(t[1][2:4],16) + 1 ) + \
+                ' : num. of trials = ' + t[5].strip('\n') + '\nMedian = ' + \
+                    t[3] + ' degrees'
+        
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'},figsize=(7,7))
+        ax.bar(theta, radii, width=width, bottom=0.0, alpha=0.5,label='Q1-Q3')
+        ax.bar(theta, radii, width=0.01, bottom=0.0, alpha=1,label='Median')
+        ax.set_title(title,size=12,wrap=False)
+        plt.legend()
+        plt.savefig(mainDir + '\\plots_withinWFMAs\\' + 'WFMA ' +\
+                    str( int(t[0][0:2],16) ) + ',' + str( int(t[0][2:4],16) + 1 ) + \
+                        '-' + str( int(t[1][0:2],16) ) + ',' + str( int(t[1][2:4],16) + 1 ) +\
+                            '.png', bbox_inches='tight',dpi=300)
+        
+        plt.show()
+    
+
+
 # mainDir = os.getcwd() + "\RelativeMappingData"
 # allTrials = CombineAllTrials(mainDir)
 # electrode = SeparateElecGroups(allTrials)
 # allTrials_sorted = SortTrials(electrode,allTrials)
 # SaveSortedTrials(allTrials_sorted, mainDir)
 
-mainDir = os.getcwd() + "\RelativeMappingData"
+mainDir = os.getcwd() + "\RelativeMappingData\\betweenWFMAs"
+if not os.path.exists(mainDir):
+    os.mkdir(mainDir)
 allTrials_sorted_and_checked = ReadSortedTrials(mainDir)
 included,excluded = SeparateNonSeenTrials(allTrials_sorted_and_checked)
-direction_sorted = ElectrodeGroups_and_Directions(included,True)
-excluded_sorted = ElectrodeGroups_and_Directions(excluded,False)
+direction_sorted = ElectrodeGroups_and_Directions_betweenWFMAs(included,True)
+excluded_sorted = ElectrodeGroups_and_Directions_betweenWFMAs(excluded,False)
 SaveDirections(direction_sorted,excluded_sorted, mainDir)
-SaveQuantiles(direction_sorted, mainDir)
+SaveQuantiles_betweenWFMAs(direction_sorted, mainDir)
+PlotQuartiles_betweenWFMAs(mainDir)
+
+mainDir = os.getcwd() + "\RelativeMappingData\\withinWFMA"
+if not os.path.exists(mainDir):
+    os.mkdir(mainDir)
+directionWithinWFMA_sorted = ElectrodeGroups_and_Directions_withinWFMA(included,True)
+excludedWithinWFMA_sorted = ElectrodeGroups_and_Directions_withinWFMA(excluded,False)
+SaveDirections(directionWithinWFMA_sorted,excludedWithinWFMA_sorted, mainDir)
+SaveQuantiles_withinWFMA(directionWithinWFMA_sorted, mainDir)
+PlotQuartiles_withinWFMA(mainDir)
+
+
+
+
 
 
 # mainDir = os.getcwd() + "\RelativeMappingData"        
